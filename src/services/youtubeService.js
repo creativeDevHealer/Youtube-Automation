@@ -117,42 +117,63 @@ class YouTubeService {
     }
   }
 
-  async getWeeklyVideos(channelId, maxResults = 50) {
+  async getWeekVideos(channelId, maxResults = 50) {
     await this.initialize();
     try {
-      // Calculate the start of the current week (Sunday)
+      // Step 1: Get uploads playlist ID
+      const channelRes = await this.youtube.channels.list({
+        part: ['contentDetails'],
+        id: channelId
+      });
+  
+      const uploadsPlaylistId = channelRes.data.items[0].contentDetails.relatedPlaylists.uploads;
+  
+      // Step 2: Get videos from that playlist
+      const videoRes = await this.youtube.playlistItems.list({
+        part: ['snippet', 'contentDetails'],
+        playlistId: uploadsPlaylistId,
+        maxResults: maxResults
+      });
+  
+      const items = videoRes.data.items;
+  
+      // Step 3: Filter videos published in the current week
       const now = new Date();
-      const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-      const daysFromSunday = currentDay; // Sunday is 0, so we go back currentDay days to reach Sunday
-      
-      const sundayOfThisWeek = new Date(now);
-      sundayOfThisWeek.setDate(now.getDate() - daysFromSunday);
-      sundayOfThisWeek.setHours(0, 0, 0, 0); // Set to beginning of Sunday
-      
-      const response = await this.youtube.search.list({
-        part: ['snippet'],
-        channelId: channelId,
-        order: 'date',
-        type: 'video',
-        maxResults: maxResults,
-        publishedAfter: sundayOfThisWeek.toISOString()
+      const dayOfWeek = now.getDay(); // Sunday = 0
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - dayOfWeek);
+      startOfWeek.setHours(0, 0, 0, 0);
+  
+      const thisWeekVideos = items.filter(item => {
+        const publishedAt = new Date(item.contentDetails.videoPublishedAt);
+        return publishedAt >= startOfWeek && publishedAt <= now;
       });
   
-      const items = response.data.items;
-      if (!items.length) return [];
+      if (thisWeekVideos.length === 0) return [];
   
-      // Filter videos uploaded from Sunday to today
-      const filteredVideos = items.filter(item => {
-        const publishedDate = new Date(item.snippet.publishedAt);
-        return publishedDate >= sundayOfThisWeek && publishedDate <= now;
+      // Step 4: Get only public videos using videos.list
+      const videoIds = thisWeekVideos.map(item => item.contentDetails.videoId);
+  
+      const videoDetailsRes = await this.youtube.videos.list({
+        part: ['status', 'snippet'],
+        id: videoIds.join(',')
       });
   
-      return filteredVideos;
+      const publicVideos = videoDetailsRes.data.items.filter(video => {
+        return (
+          video.status.privacyStatus === 'public' &&
+          video.snippet.liveBroadcastContent !== 'upcoming'
+        );
+      });
+      console.log(publicVideos);
+      return publicVideos;
+
     } catch (error) {
       logger.error('Error getting weekly videos:', error);
       throw error;
     }
   }
+  
 
   // Get video comments
   async getVideoComments(videoId, maxResults = 100) {
@@ -166,7 +187,6 @@ class YouTubeService {
         textFormat: 'plainText',
         moderationStatus: 'published'
       });
-
       return response.data.items;
     } catch (error) {
       logger.error('Error getting video comments:', error);

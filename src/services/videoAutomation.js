@@ -18,7 +18,7 @@ class VideoAutomation {
       logger.info('Starting video automation cycle');
       
       // Get videos that are published on the latest date.
-      const videos = await youtubeService.getWeeklyVideos(process.env.YOUTUBE_CHANNEL_ID, 20);
+      const videos = await youtubeService.getWeekVideos(process.env.YOUTUBE_CHANNEL_ID, 20);
       
       console.log(videos);
 
@@ -27,9 +27,10 @@ class VideoAutomation {
         return this.stats;
       }
       
+
       for (const video of videos) {
-        logger.info(`Processing timestamps and description for video: ${video.id.videoId}`);
-        await this.processVideoTimestampsAndDescription(video.id.videoId, video.snippet.title);
+        logger.info(`Processing timestamps and description for video: ${video.id}`);
+        await this.processVideoTimestampsAndDescription(video.id, video.snippet.title);
       }
       
       logger.info(`Video automation completed. Stats: ${JSON.stringify(this.stats)}`);
@@ -43,90 +44,63 @@ class VideoAutomation {
   // Process comments for a specific video
   async processVideoTimestampsAndDescription(videoId, videoTitle) {
     try {
+      // Get detailed video information
+      const videoInfo = await youtubeService.getVideoInfo(videoId);
+      const videoDescription = videoInfo?.snippet?.description || '';
+      const videoTags = videoInfo?.snippet?.tags || [];
+      const liveBroadcastContent = videoInfo?.snippet?.liveBroadcastContent;
+      
+      // Detect video type
+      const videoType = this.detectVideoType(videoTitle, videoDescription, videoTags, liveBroadcastContent);
+      
+      logger.info(`Video type detected: ${videoType} for video "${videoTitle}"`);
       
       // Get transcript for video
-      const transcript = await youtubeService.getTranscript(videoId);
+    //   const transcript = await youtubeService.getTranscript(videoId);
       
-      logger.info(`Successfully fetched transcript for video ${videoId}`);
+    //   logger.info(`Successfully fetched transcript for video ${videoId}`);
       
     } catch (error) {
-      logger.error(`Error fetching transcript for video ${videoId}:`, error);
+      logger.error(`Error processing video ${videoId}:`, error);
     }
   }
 
-  // Process a single comment
-  async processSingleComment(comment, videoId, videoTitle) {
-    try {
-      // Use findOneAndUpdate to handle race conditions and duplicates
-      let commentRecord = await Comment.findOneAndUpdate(
-        { commentId: comment.id },
-        {
-          $setOnInsert: {
-            commentId: comment.id,
-            videoId: videoId,
-            authorChannelId: comment.snippet.authorChannelId?.value || null,
-            authorDisplayName: comment.snippet.authorDisplayName,
-            authorProfileImageUrl: comment.snippet.authorProfileImageUrl,
-            textDisplay: comment.snippet.textDisplay,
-            textOriginal: comment.snippet.textOriginal,
-            likeCount: comment.snippet.likeCount,
-            publishedAt: comment.snippet.publishedAt,
-            updatedAt: comment.snippet.updatedAt,
-            processed: false
-          }
-        },
-        { 
-          upsert: true, 
-          new: true,
-          setDefaultsOnInsert: true
-        }
-      );
-
-      // Skip if already processed (double-check after upsert)
-      if (commentRecord.processed) {
-        return;
+  // Detect video type based on title, description, tags, and live status
+  detectVideoType(title, description, tags, liveBroadcastContent) {
+    const titleLower = title.toLowerCase();
+    const tagsLower = (tags || []).map(tag => tag.toLowerCase());
+    const descriptionLower = description.toLowerCase();
+    const zodiacSigns = [
+      'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+      'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'
+    ];
+    const bonusTier3Keywords = [
+      'bonus', 'extended reading', 'all 12 signs', 'really good & legendary members'
+    ];
+    
+    for (const keyword of bonusTier3Keywords) {
+      if (titleLower.includes(keyword)) {
+        return 'bonus_video';
       }
-
-      // Check membership status using CSV data
-      const memberInfo = this.getMemberInfo(comment.snippet.authorChannelId?.value || null);
-      commentRecord.memberStatus = memberInfo.tier;
-      commentRecord.memberLevel = memberInfo.level;
-      commentRecord.memberName = memberInfo.name;
-
-      // Analyze comment with AI
-      const analysis = await aiService.analyzeComment(comment.snippet.textOriginal);
-      logger.debug(`AI analysis for comment ${comment.id}:`, analysis);
-      
-      // Normalize detectedKeywords categories to lowercase
-      if (analysis.detectedKeywords && Array.isArray(analysis.detectedKeywords)) {
-        analysis.detectedKeywords = analysis.detectedKeywords.map(keyword => ({
-          ...keyword,
-          category: keyword.category ? keyword.category.toLowerCase() : 'unknown'
-        }));
-      }
-      
-      // Update comment record with analysis
-      commentRecord.sentiment = analysis.sentiment;
-      commentRecord.detectedKeywords = analysis.detectedKeywords;
-      commentRecord.toxicity = {
-        score: analysis.sentiment.score,
-        flagged: analysis.toxicity,
-        reasons: this.getToxicityReasons(analysis)
-      };
-
-      // Process automation actions
-      await this.processAutomationActions(videoId, videoTitle, commentRecord, analysis);
-
-      // Mark as processed
-      commentRecord.processed = true;
-      await commentRecord.save();
-
-      this.stats.processed++;
-      
-    } catch (error) {
-      logger.error(`Error processing comment ${comment.id}:`, error);
-      this.stats.errors++;
     }
+    const hasZodiacPrefix = zodiacSigns.some(sign => titleLower.startsWith(sign));
+    if (hasZodiacPrefix) {
+      return 'weekly_forecast';
+    }
+    // Check for livestream
+    if (liveBroadcastContent === 'live' || liveBroadcastContent === 'upcoming') {
+      return 'livestream';
+    }
+    if (tagsLower.includes('live') || tagsLower.includes('stream')) {
+      return 'livestream';
+    }
+    const allTags = tagsLower.join(' ');
+    if (allTags.includes('live') || allTags.includes('stream')) {
+      return 'livestream';
+    }
+    if(descriptionLower.includes('livestream'))
+      return 'livestream';
+    return 'regular';
   }
 }
 

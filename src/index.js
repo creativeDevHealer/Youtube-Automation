@@ -34,6 +34,7 @@ function validateEnvironment() {
 
 // Import modules
 const commentAutomation = require('./services/commentAutomation');
+const videoAutomation = require('./services/videoAutomation');
 const adminRoutes = require('./routes/admin');
 const logger = require('./utils/logger');
 
@@ -73,9 +74,15 @@ app.get('/health', (req, res) => {
 async function initializeServices() {
   try {
     // Start comment automation (runs every 10 minutes)
-    cron.schedule('*/10 * * * *', async () => {
-      logger.info('Starting comment automation cycle');
-      await commentAutomation.processComments();
+    // cron.schedule('*/10 * * * *', async () => {
+    //   logger.info('Starting comment automation cycle');
+    //   await commentAutomation.processComments();
+    // });
+
+    // Start video automation (runs every 10 minutes)
+    cron.schedule('*/1 * * * *', async () => {
+      logger.info('Starting video automation cycle');
+      await videoAutomation.processVideos();
     });
 
     // Generate daily report (runs daily at 9 AM)
