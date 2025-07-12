@@ -165,7 +165,7 @@ class YouTubeService {
           video.snippet.liveBroadcastContent !== 'upcoming'
         );
       });
-      console.log(publicVideos);
+      // console.log(publicVideos);
       return publicVideos;
 
     } catch (error) {
@@ -191,6 +191,100 @@ class YouTubeService {
     } catch (error) {
       logger.error('Error getting video comments:', error);
       throw error;
+    }
+  }
+
+  async checkIfVideoHasNoComments(videoId) {
+    await this.initialize(); // Make sure your YouTube client is ready
+  
+    try {
+      const res = await this.youtube.commentThreads.list({
+        part: ['id'],
+        videoId: videoId,
+        maxResults: 1, // We just need to know if at least 1 comment exists
+        order: 'time'
+      });
+  
+      if (res.data.items.length === 0) {
+        console.log(`❌ No comments found for video: ${videoId}`);
+        return true; // No comments
+      }
+  
+      console.log(`✅ Comments found for video: ${videoId}`);
+      return false; // Comments exist
+    } catch (error) {
+      if (error.errors && error.errors[0].reason === 'commentsDisabled') {
+        console.log(`⚠️ Comments are disabled for video: ${videoId}`);
+        return false;
+      }
+  
+      console.error('❌ Error checking comments:', error.message);
+      throw error;
+    }
+  }
+
+  async addTopLevelComment(videoId, text) {
+    await this.initialize();
+    const response = await this.youtube.commentThreads.insert({
+      part: ['snippet'],
+      requestBody: {
+        snippet: {
+          videoId: videoId,
+          topLevelComment: {
+            snippet: {
+              textOriginal: text
+            }
+          }
+        }
+      }
+    });
+  
+    console.log(`✅ Comment added to video ${videoId}`);
+    console.log(`🗨️ Comment ID: ${response.data.id}`);
+    return response.data;
+  }
+
+  async downloadCaptions(videoId, format = 'srt') {
+    await this.initialize();
+  
+    try {
+      // Step 1: List caption tracks
+      const captionListRes = await this.youtube.captions.list({
+        part: ['id', 'snippet'],
+        videoId: videoId
+      });
+  
+      const tracks = captionListRes.data.items;
+      if (tracks.length === 0) {
+        console.log('❌ No caption tracks found.');
+        return;
+      }
+  
+      // Step 2: Pick first caption track (adjust if needed)
+      const captionId = tracks[0].id;
+      const language = tracks[0].snippet.language;
+      console.log(`✅ Found captions in: ${language}`);
+  
+      // Step 3: Download caption file
+      const res = await this.youtube.captions.download(
+        { id: captionId, tfmt: format },
+        { responseType: 'stream' }
+      );
+  
+      const outPath = path.join(__dirname, `captions-${videoId}.${format}`);
+      const dest = fs.createWriteStream(outPath);
+  
+      await new Promise((resolve, reject) => {
+        res.data
+          .pipe(dest)
+          .on('finish', () => {
+            console.log(`✅ Captions saved to: ${outPath}`);
+            resolve();
+          })
+          .on('error', reject);
+      });
+    } catch (err) {
+      console.error('❌ Error fetching captions:', err.message);
     }
   }
 
@@ -231,6 +325,42 @@ class YouTubeService {
       return { success: false, reason: 'API limitation - liking not supported' };
     } catch (error) {
       logger.error('Error in likeComment:', error);
+      throw error;
+    }
+  }
+
+  async updateVideoDescription(videoId, newDescription) {
+    await this.initialize(); // Ensure OAuth and YouTube client are ready
+  
+    try {
+      // Step 1: Get the current video metadata (required before updating)
+      const getRes = await this.youtube.videos.list({
+        part: ['snippet'],
+        id: videoId
+      });
+  
+      if (getRes.data.items.length === 0) {
+        throw new Error(`No video found with ID: ${videoId}`);
+      }
+  
+      const video = getRes.data.items[0];
+      const snippet = video.snippet;
+  
+      // Step 2: Update the snippet with the new description
+      snippet.description = newDescription;
+  
+      const updateRes = await this.youtube.videos.update({
+        part: ['snippet'],
+        requestBody: {
+          id: videoId,
+          snippet: snippet
+        }
+      });
+  
+      console.log(`✅ Description updated for video: ${videoId}`);
+      return updateRes.data;
+    } catch (error) {
+      console.error(`❌ Failed to update video description:`, error);
       throw error;
     }
   }

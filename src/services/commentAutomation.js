@@ -137,7 +137,7 @@ class CommentAutomation {
       // Get videos that are published on the latest date.
       const videos = await youtubeService.getRecentVideos(process.env.YOUTUBE_CHANNEL_ID, 20);
       
-      console.log(videos);
+      // console.log(videos);
 
       if (videos.length === 0) {
         logger.info('No videos found on channel. Skipping comment processing.');
