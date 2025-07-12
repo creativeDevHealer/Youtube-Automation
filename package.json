@@ -1,0 +1,49 @@
+{
+  "name": "ai-youtube-assistant",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "youtube",
+    "automation",
+    "ai",
+    "tarot",
+    "astrology",
+    "comments"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "AI-powered YouTube comment automation system for tarot/astrology channel",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.0.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.1.5",
+    "googleapis": "^150.0.1",
+    "helmet": "^7.1.0",
+    "https-proxy-agent": "^7.0.6",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "moment": "^2.29.4",
+    "mongoose": "^8.16.1",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^7.0.4",
+    "openai": "^5.8.2",
+    "socks-proxy-agent": "^8.0.5",
+    "winston": "^3.11.0",
+    "youtube-caption-extractor": "^1.4.3",
+    "youtube-transcript": "^1.2.1",
+    "youtube-transcript-plus": "^1.0.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
