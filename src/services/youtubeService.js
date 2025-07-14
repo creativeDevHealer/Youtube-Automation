@@ -145,7 +145,7 @@ class YouTubeService {
       startOfWeek.setHours(0, 0, 0, 0);
   
       const thisWeekVideos = items.filter(item => {
-        const publishedAt = new Date(item.contentDetails.videoPublishedAt);
+        const publishedAt = new Date(item.snippet.publishedAt);
         return publishedAt >= startOfWeek && publishedAt <= now;
       });
   

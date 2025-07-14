@@ -79,8 +79,8 @@ async function initializeServices() {
       await commentAutomation.processComments();
     });
 
-    // Start video automation (runs every 10 minutes)
-    cron.schedule('*/1 * * * *', async () => {
+    // Start video automation (runs every 1 hour)
+    cron.schedule('*0 * * * *', async () => {
       logger.info('Starting video automation cycle');
       await videoAutomation.processVideos();
     });
