@@ -80,7 +80,7 @@ async function initializeServices() {
     });
 
     // Start video automation (runs every 1 hour)
-    cron.schedule('*0 * * * *', async () => {
+    cron.schedule('0 * * * *', async () => {
       logger.info('Starting video automation cycle');
       await videoAutomation.processVideos();
     });

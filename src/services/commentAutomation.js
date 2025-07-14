@@ -225,33 +225,24 @@ class CommentAutomation {
   async processSingleComment(comment, videoId, videoTitle) {
     try {
       // Use findOneAndUpdate to handle race conditions and duplicates
-      let commentRecord = await Comment.findOneAndUpdate(
-        { commentId: comment.id },
-        {
-          $setOnInsert: {
-            commentId: comment.id,
-            videoId: videoId,
-            authorChannelId: comment.snippet.authorChannelId?.value || null,
-            authorDisplayName: comment.snippet.authorDisplayName,
-            authorProfileImageUrl: comment.snippet.authorProfileImageUrl,
-            textDisplay: comment.snippet.textDisplay,
-            textOriginal: comment.snippet.textOriginal,
-            likeCount: comment.snippet.likeCount,
-            publishedAt: comment.snippet.publishedAt,
-            updatedAt: comment.snippet.updatedAt,
-            processed: false
-          }
-        },
-        { 
-          upsert: true, 
-          new: true,
-          setDefaultsOnInsert: true
-        }
-      );
+      let commentRecord = await Comment.findOne({ commentId: comment.id });
 
-      // Skip if already processed (double-check after upsert)
-      if (commentRecord.processed) {
-        return;
+      if (!commentRecord) {
+        commentRecord = await Comment.create({
+          commentId: comment.id,
+          videoId: videoId,
+          authorChannelId: comment.snippet.authorChannelId?.value || null,
+          authorDisplayName: comment.snippet.authorDisplayName,
+          authorProfileImageUrl: comment.snippet.authorProfileImageUrl,
+          textDisplay: comment.snippet.textDisplay,
+          textOriginal: comment.snippet.textOriginal,
+          likeCount: comment.snippet.likeCount,
+          publishedAt: comment.snippet.publishedAt,
+          updatedAt: comment.snippet.updatedAt,
+          processed: false
+        });
+      } else if (commentRecord.processed) {
+        return; // Already processed, skip
       }
 
       // Check membership status using CSV data
