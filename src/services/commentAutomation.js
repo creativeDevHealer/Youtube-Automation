@@ -239,9 +239,9 @@ class CommentAutomation {
           likeCount: comment.snippet.likeCount,
           publishedAt: comment.snippet.publishedAt,
           updatedAt: comment.snippet.updatedAt,
-          processed: false
+          processed: true
         });
-      } else if (commentRecord.processed) {
+      } else {
         return; // Already processed, skip
       }
 
@@ -264,20 +264,20 @@ class CommentAutomation {
       }
       
       // Update comment record with analysis
-      commentRecord.sentiment = analysis.sentiment;
-      commentRecord.detectedKeywords = analysis.detectedKeywords;
-      commentRecord.toxicity = {
-        score: analysis.sentiment.score,
-        flagged: analysis.toxicity,
-        reasons: this.getToxicityReasons(analysis)
-      };
+      // commentRecord.sentiment = analysis.sentiment;
+      // commentRecord.detectedKeywords = analysis.detectedKeywords;
+      // commentRecord.toxicity = {
+      //   score: analysis.sentiment.score,
+      //   flagged: analysis.toxicity,
+      //   reasons: this.getToxicityReasons(analysis)
+      // };
 
       // Process automation actions
       await this.processAutomationActions(videoId, videoTitle, commentRecord, analysis);
 
-      // Mark as processed
-      commentRecord.processed = true;
-      await commentRecord.save();
+      // // Mark as processed
+      // commentRecord.processed = true;
+      // await commentRecord.save();
 
       this.stats.processed++;
       
