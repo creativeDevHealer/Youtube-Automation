@@ -86,37 +86,6 @@ class YouTubeService {
     }
   }
 
-  // Get recent videos
-  async getRecentVideos(channelId, maxResults = 50) {
-    await this.initialize();
-    try {
-      const response = await this.youtube.search.list({
-        part: ['snippet'],
-        channelId: channelId,
-        order: 'date',
-        type: 'video',
-        maxResults: maxResults
-      });
-  
-      const items = response.data.items;
-      if (!items.length) return [];
-  
-      // Extract latest upload date (YYYY-MM-DD)
-      const latestDate = new Date(items[0].snippet.publishedAt).toISOString().split('T')[0];
-  
-      // Filter videos uploaded on that same date
-      const filteredVideos = items.filter(item => {
-        const itemDate = new Date(item.snippet.publishedAt).toISOString().split('T')[0];
-        return itemDate === latestDate;
-      });
-  
-      return filteredVideos;
-    } catch (error) {
-      logger.error('Error getting recent videos:', error);
-      throw error;
-    }
-  }
-
   async getWeekVideos(channelId, maxResults = 50) {
     await this.initialize();
     try {
@@ -145,7 +114,7 @@ class YouTubeService {
       startOfWeek.setHours(0, 0, 0, 0);
   
       const thisWeekVideos = items.filter(item => {
-        const publishedAt = new Date(item.snippet.publishedAt);
+        const publishedAt = new Date(item.contentDetails.videoPublishedAt);
         return publishedAt >= startOfWeek && publishedAt <= now;
       });
   
@@ -221,6 +190,51 @@ class YouTubeService {
         video.status.privacyStatus === 'public' &&
         video.snippet.liveBroadcastContent !== 'upcoming'
       );
+  
+      return publicVideos;
+  
+    } catch (error) {
+      logger.error('Error getting videos from last publish date:', error);
+      throw error;
+    }
+  }
+
+  async getRecentVideos(channelId, maxResults = 50) {
+    await this.initialize();
+  
+    try {
+      const channelRes = await this.youtube.channels.list({
+        part: ['contentDetails'],
+        id: channelId
+      });
+  
+      const uploadsPlaylistId = channelRes.data.items[0].contentDetails.relatedPlaylists.uploads;
+
+      const videoRes = await this.youtube.playlistItems.list({
+        part: ['snippet', 'contentDetails'],
+        playlistId: uploadsPlaylistId,
+        maxResults
+      });
+  
+      const items = videoRes.data.items;
+  
+      if (items.length === 0) return [];
+  
+      const videoIds = items.map(item => item.contentDetails.videoId);
+
+      const videoDetailsRes = await this.youtube.videos.list({
+        part: ['status', 'snippet'],
+        id: videoIds.join(',')
+      });
+  
+      const publicVideos = videoDetailsRes.data.items
+        .filter(video =>
+          video.status.privacyStatus === 'public' &&
+          video.snippet.liveBroadcastContent !== 'upcoming'
+        )
+        .sort((a, b) =>
+          new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt)
+        ); // sort by most recent
   
       return publicVideos;
   

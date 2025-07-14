@@ -135,7 +135,8 @@ class CommentAutomation {
       logger.info('Starting comment automation cycle');
       
       // Get videos that are published on the latest date.
-      const videos = await youtubeService.getLastPublishedDateVideos(process.env.YOUTUBE_CHANNEL_ID, 5);
+      // const videos = await youtubeService.getLastPublishedDateVideos(process.env.YOUTUBE_CHANNEL_ID, 5);
+      const videos = await youtubeService.getRecentVideos(process.env.YOUTUBE_CHANNEL_ID, 20)
       
       // console.log(videos);
 
