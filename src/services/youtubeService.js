@@ -174,6 +174,61 @@ class YouTubeService {
     }
   }
   
+  async getLastPublishedDateVideos(channelId, maxResults = 50) {
+    await this.initialize();
+  
+    try {
+      // Step 1: Get uploads playlist ID
+      const channelRes = await this.youtube.channels.list({
+        part: ['contentDetails'],
+        id: channelId
+      });
+  
+      const uploadsPlaylistId = channelRes.data.items[0].contentDetails.relatedPlaylists.uploads;
+  
+      // Step 2: Fetch latest videos from that playlist
+      const videoRes = await this.youtube.playlistItems.list({
+        part: ['snippet', 'contentDetails'],
+        playlistId: uploadsPlaylistId,
+        maxResults
+      });
+  
+      const items = videoRes.data.items;
+  
+      if (items.length === 0) return [];
+  
+      // Step 3: Find the most recent publish date (YYYY-MM-DD)
+      const publishDates = items.map(item =>
+        new Date(item.snippet.publishedAt).toISOString().split('T')[0]
+      );
+      const latestDate = publishDates.sort().reverse()[0];
+  
+      // Step 4: Filter videos published on the latest date
+      const latestVideos = items.filter(item =>
+        item.snippet.publishedAt.startsWith(latestDate)
+      );
+  
+      const videoIds = latestVideos.map(item => item.contentDetails.videoId);
+      // const videoIds = items.map(item => item.contentDetails.videoId);
+  
+      // Step 5: Fetch full video details (to check public status)
+      const videoDetailsRes = await this.youtube.videos.list({
+        part: ['status', 'snippet'],
+        id: videoIds.join(',')
+      });
+  
+      const publicVideos = videoDetailsRes.data.items.filter(video =>
+        video.status.privacyStatus === 'public' &&
+        video.snippet.liveBroadcastContent !== 'upcoming'
+      );
+  
+      return publicVideos;
+  
+    } catch (error) {
+      logger.error('Error getting videos from last publish date:', error);
+      throw error;
+    }
+  }
 
   // Get video comments
   async getVideoComments(videoId, maxResults = 100) {

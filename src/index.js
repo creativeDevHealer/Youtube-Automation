@@ -73,11 +73,11 @@ app.get('/health', (req, res) => {
 // Initialize automation services
 async function initializeServices() {
   try {
-    // Start comment automation (runs every 10 minutes)
-    // cron.schedule('*/10 * * * *', async () => {
-    //   logger.info('Starting comment automation cycle');
-    //   await commentAutomation.processComments();
-    // });
+    // Start comment automation (runs every 1 hour)
+    cron.schedule('0 * * * *', async () => {
+      logger.info('Starting comment automation cycle');
+      await commentAutomation.processComments();
+    });
 
     // Start video automation (runs every 10 minutes)
     cron.schedule('*/1 * * * *', async () => {
