@@ -68,6 +68,7 @@ Thumbs.db
 
 client_secret.json
 google-credentials.json
-# token.json
+token.json
 client_secret1.json
-# members of channel.csv
+members of channel.csv
+canva_tokens.json

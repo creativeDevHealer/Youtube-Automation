@@ -35,6 +35,7 @@ function validateEnvironment() {
 // Import modules
 const commentAutomation = require('./services/commentAutomation');
 const videoAutomation = require('./services/videoAutomation');
+const thumbnailAutomation = require('./services/thumbnailAutomation');
 const adminRoutes = require('./routes/admin');
 const logger = require('./utils/logger');
 
@@ -85,13 +86,23 @@ async function initializeServices() {
       await videoAutomation.processVideos();
     });
 
+    // Start thumbnail automation (runs every 1 hour)
+    cron.schedule('0 * * * *', async () => {
+      logger.info('Starting thumbnail automation cycle');
+      try {
+        await thumbnailAutomation.processThumbnails();
+      } catch (error) {
+        logger.error('Error in thumbnail automation:', error);
+      }
+    });
+    
     // Generate daily report (runs daily at 9 AM)
     // cron.schedule('0 9 * * *', async () => {
     //   logger.info('Generating daily sentiment analysis report');
     //   await commentAutomation.generateDailyReport();
     // });
 
-    logger.info('Comment automation services initialized');
+    logger.info('Automation services initialized (comments, videos, thumbnails)');
   } catch (error) {
     logger.error('Error initializing services:', error);
   }

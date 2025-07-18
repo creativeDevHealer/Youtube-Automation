@@ -543,6 +543,60 @@ class YouTubeService {
     const timestampsParam = '&timestamps=true';
     return `${baseUrl}${videoId}${timestampsParam}`;
   }
+
+  // Update video thumbnail
+  async updateVideoThumbnail(videoId, imageBuffer) {
+    await this.initialize();
+    try {
+      logger.info(`Updating thumbnail for video: ${videoId}`);
+
+      // Use the YouTube API v3 thumbnails.set endpoint
+      const response = await this.youtube.thumbnails.set({
+        videoId: videoId,
+        media: {
+          mimeType: 'image/jpeg',
+          body: imageBuffer
+        }
+      });
+
+      logger.info(`Successfully updated thumbnail for video: ${videoId}`);
+      return { 
+        success: true, 
+        data: response.data,
+        thumbnailUrl: response.data.items?.[0]?.default?.url
+      };
+      
+    } catch (error) {
+      logger.error(`Error updating thumbnail for video ${videoId}:`, error);
+      return { 
+        success: false, 
+        error: error.message,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Get video thumbnail URLs
+  async getVideoThumbnails(videoId) {
+    await this.initialize();
+    try {
+      const response = await this.youtube.videos.list({
+        part: ['snippet'],
+        id: [videoId]
+      });
+
+      if (response.data.items.length === 0) {
+        throw new Error(`No video found with ID: ${videoId}`);
+      }
+
+      const thumbnails = response.data.items[0].snippet.thumbnails;
+      return { success: true, thumbnails };
+      
+    } catch (error) {
+      logger.error(`Error getting thumbnails for video ${videoId}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = new YouTubeService(); 

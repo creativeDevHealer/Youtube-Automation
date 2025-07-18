@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const commentAutomation = require('../services/commentAutomation');
+const thumbnailAutomation = require('../services/thumbnailAutomation');
 const Comment = require('../models/Comment');
 const Member = require('../models/Member');
+const ThumbnailUpdate = require('../models/ThumbnailUpdate');
 const logger = require('../utils/logger');
 
 // Middleware to check admin authentication
@@ -323,6 +325,177 @@ router.get('/search-comments', async (req, res) => {
   }
 });
 
+// Thumbnail automation endpoints
+router.post('/thumbnails/process', async (req, res) => {
+  try {
+    logger.info('Manual thumbnail processing requested');
+    const result = await thumbnailAutomation.processThumbnails();
+    res.json({ success: true, stats: result });
+  } catch (error) {
+    logger.error('Error in manual thumbnail processing:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/thumbnails/retry-failed', async (req, res) => {
+  try {
+    logger.info('Manual retry of failed thumbnails requested');
+    await thumbnailAutomation.retryFailedThumbnails();
+    res.json({ success: true, message: 'Failed thumbnails retry initiated' });
+  } catch (error) {
+    logger.error('Error retrying failed thumbnails:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/thumbnails/stats', async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const stats = await ThumbnailUpdate.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+          created: { $sum: { $cond: [{ $eq: ['$status', 'created'] }, 1, 0] } },
+          uploaded: { $sum: { $cond: [{ $eq: ['$status', 'uploaded'] }, 1, 0] } },
+          failed: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } },
+          
+          // Today's stats
+          todayTotal: { 
+            $sum: { 
+              $cond: [
+                { $gte: ['$createdAt', today] }, 
+                1, 
+                0
+              ] 
+            } 
+          },
+          todayUploaded: { 
+            $sum: { 
+              $cond: [
+                { 
+                  $and: [
+                    { $gte: ['$createdAt', today] },
+                    { $eq: ['$status', 'uploaded'] }
+                  ]
+                }, 
+                1, 
+                0
+              ] 
+            } 
+          },
+          
+          // By video type
+          weeklyForecast: { $sum: { $cond: [{ $eq: ['$videoType', 'weekly_forecast'] }, 1, 0] } },
+          bonusVideo: { $sum: { $cond: [{ $eq: ['$videoType', 'bonus_video'] }, 1, 0] } },
+          livestream: { $sum: { $cond: [{ $eq: ['$videoType', 'livestream'] }, 1, 0] } },
+          regular: { $sum: { $cond: [{ $eq: ['$videoType', 'regular'] }, 1, 0] } },
+          
+          avgProcessingTime: { $avg: '$automationStats.processingTimeMs' }
+        }
+      }
+    ]);
+
+    const recentThumbnails = await ThumbnailUpdate.find()
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('videoId videoTitle status videoType createdAt lastUpdated errorMessage');
+
+    res.json({
+      stats: stats[0] || {
+        total: 0, pending: 0, created: 0, uploaded: 0, failed: 0,
+        todayTotal: 0, todayUploaded: 0,
+        weeklyForecast: 0, bonusVideo: 0, livestream: 0, regular: 0,
+        avgProcessingTime: 0
+      },
+      recentThumbnails
+    });
+  } catch (error) {
+    logger.error('Error getting thumbnail stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/thumbnails/recent', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const thumbnails = await ThumbnailUpdate.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await ThumbnailUpdate.countDocuments();
+
+    res.json({
+      thumbnails,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    logger.error('Error getting recent thumbnails:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/thumbnails/failed', async (req, res) => {
+  try {
+    const failedThumbnails = await ThumbnailUpdate.find({ 
+      status: 'failed',
+      retryCount: { $lt: 3 }
+    })
+    .sort({ createdAt: -1 })
+    .limit(50);
+
+    res.json(failedThumbnails);
+  } catch (error) {
+    logger.error('Error getting failed thumbnails:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get thumbnail by video ID
+router.get('/thumbnails/:videoId', async (req, res) => {
+  try {
+    const thumbnail = await ThumbnailUpdate.findOne({ videoId: req.params.videoId });
+    
+    if (!thumbnail) {
+      return res.status(404).json({ error: 'Thumbnail not found' });
+    }
+
+    res.json(thumbnail);
+  } catch (error) {
+    logger.error('Error getting thumbnail:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete/reset thumbnail update record
+router.delete('/thumbnails/:videoId', async (req, res) => {
+  try {
+    const result = await ThumbnailUpdate.findOneAndDelete({ videoId: req.params.videoId });
+    
+    if (!result) {
+      return res.status(404).json({ error: 'Thumbnail not found' });
+    }
+
+    logger.info(`Deleted thumbnail record for video: ${req.params.videoId}`);
+    res.json({ success: true, message: 'Thumbnail record deleted' });
+  } catch (error) {
+    logger.error('Error deleting thumbnail:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Health check
 router.get('/health', (req, res) => {
   res.json({ 
@@ -330,6 +503,8 @@ router.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     services: {
       commentAutomation: 'running',
+      videoAutomation: 'running', 
+      thumbnailAutomation: 'running',
       database: 'connected'
     }
   });
