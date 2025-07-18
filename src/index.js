@@ -35,7 +35,6 @@ function validateEnvironment() {
 // Import modules
 const commentAutomation = require('./services/commentAutomation');
 const videoAutomation = require('./services/videoAutomation');
-const thumbnailAutomation = require('./services/thumbnailAutomation');
 const adminRoutes = require('./routes/admin');
 const logger = require('./utils/logger');
 
@@ -65,11 +64,6 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/youtube-c
 
 // Routes
 app.use('/api/admin', adminRoutes);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
 
 // Initialize automation services
 async function initializeServices() {
