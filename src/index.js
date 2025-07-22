@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const cron = require('node-cron');
+const path = require('path');
 
 // Load environment variables
 dotenv.config();
@@ -41,11 +42,44 @@ const logger = require('./utils/logger');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security middleware
-app.use(helmet());
+// Security middleware with CSP configured for admin dashboard
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'", 
+        "'unsafe-inline'",
+        "https://code.jquery.com",
+        "https://cdn.jsdelivr.net",
+        "https://cdn.datatables.net"
+      ],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: [
+        "'self'", 
+        "https://cdn.jsdelivr.net",
+        "https://cdn.datatables.net",
+        "https://cdnjs.cloudflare.com",
+        "https://fonts.googleapis.com",
+        "'unsafe-inline'"
+      ],
+      fontSrc: [
+        "'self'", 
+        "https://cdnjs.cloudflare.com",
+        "https://fonts.gstatic.com",
+        "data:"
+      ],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"]
+    }
+  }
+}));
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from views directory
+app.use('/views', express.static(path.join(__dirname, 'views')));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -63,7 +97,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/youtube-c
 .catch(err => logger.error('MongoDB connection error:', err));
 
 // Routes
-app.use('/api/admin', adminRoutes);
+app.use('/admin', adminRoutes);
 
 // Initialize automation services
 async function initializeServices() {
@@ -79,12 +113,6 @@ async function initializeServices() {
       logger.info('Starting video automation cycle');
       await videoAutomation.processVideos();
     });
-
-    // Generate daily report (runs daily at 9 AM)
-    // cron.schedule('0 9 * * *', async () => {
-    //   logger.info('Generating daily sentiment analysis report');
-    //   await commentAutomation.generateDailyReport();
-    // });
 
     logger.info('Automation services initialized (comments, videos, thumbnails)');
   } catch (error) {

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - YouTube Comment Assistant</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/views/admin-dashboard.css">
+</head>
+<body>
+    <!-- Authentication Modal -->
+    <div class="modal fade auth-modal" id="authModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header text-white">
+                    <h5 class="modal-title"><i class="fas fa-lock me-2"></i>Admin Authentication</h5>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="authForm">
+                        <div class="mb-3">
+                            <label for="apiKey" class="form-label">API Key</label>
+                            <input type="password" class="form-control" id="apiKey" placeholder="Enter admin API key" required>
+                        </div>
+                        <div id="authError" class="alert alert-danger d-none"></div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile menu button -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <h5><i class="fab fa-youtube me-2"></i>YouTube Admin</h5>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-item">
+                <a href="#dashboard" class="nav-link active" data-section="dashboard">
+                    <i class="fas fa-chart-line"></i>Dashboard
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="#comment-actions" class="nav-link" data-section="comment-actions">
+                    <i class="fas fa-comments"></i>Comment Actions
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="#processed-videos" class="nav-link" data-section="processed-videos">
+                    <i class="fas fa-video"></i>Processed Videos
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="#thumbnail-update" class="nav-link" data-section="thumbnail-update">
+                    <i class="fas fa-image"></i>Thumbnail Update
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-content">
+        <!-- Header -->
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="content-section">
+            <div class="section-header">
+                <h2 class="section-title">Overview</h2>
+                <p class="section-subtitle">Key metrics and statistics</p>
+            </div>
+            
+            <div style="padding: 24px;">
+                <div class="stats-grid" id="statsCards">
+                    <!-- Stats will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Comment Actions Section -->
+        <div id="comment-actions-section" class="content-section d-none">
+            <div class="section-header">
+                <h2 class="section-title">Comment Actions</h2>
+                <p class="section-subtitle">Track automated comment moderation</p>
+            </div>
+            <div class="table-container">
+                <table id="commentActionsTable" class="table" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Video</th>
+                            <th>Action</th>
+                            <th>Comment</th>
+                            <th>Author</th>
+                            <th>Status</th>
+                            <th>Reason</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+
+        <!-- Processed Videos Section -->
+        <div id="processed-videos-section" class="content-section d-none">
+            <div class="section-header">
+                <h2 class="section-title">Processed Videos</h2>
+                <p class="section-subtitle">Videos that have been automatically processed</p>
+            </div>
+            <div class="table-container">
+                <table id="processedVideosTable" class="table" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Created</th>
+                            <th>Video Title</th>
+                            <th>Type</th>
+                            <th>Zodiac</th>
+                            <th>Week</th>
+                            <th>Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+
+        <!-- Thumbnail Update Section -->
+        <div id="thumbnail-update-section" class="content-section d-none">
+            <div class="section-header">
+                <h2 class="section-title">Thumbnail Update</h2>
+                <p class="section-subtitle">Generate and update video thumbnails</p>
+            </div>
+            <div style="padding: 24px;">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-image me-2"></i>Generate/Update Thumbnail</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="thumbnailForm">
+                                    <div class="mb-3">
+                                        <label for="videoId" class="form-label">Title</label>
+                                        <input type="text" class="form-control" id="title" placeholder="Enter Title of Video" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="videoId" class="form-label">Content</label>
+                                        <input type="text" class="form-control" id="content" placeholder="Enter Content of Video" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="videoId" class="form-label">Subtitle</label>
+                                        <input type="text" class="form-control" id="subtitle" placeholder="Enter Subtitle of Video" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="weekRange" class="form-label">Week Range</label>
+                                        <input type="text" class="form-control" id="weekRange" placeholder="e.g., Dec 23-29" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Thumbnail Style</label>
+                                        <div class="row g-2">
+                                            <div class="col-3">
+                                                <div class="style-option" data-style="template1">
+                                                    <div class="style-card">
+                                                        <div class="style-image">
+                                                            <img src="/views/assets/template1.jpg" alt="Template 1">
+                                                        </div>
+                                                        <div class="style-label">TEMPLATE 1</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-3">
+                                                <div class="style-option" data-style="template2">
+                                                    <div class="style-card">
+                                                        <div class="style-image">
+                                                            <img src="/views/assets/template2.jpg" alt="Template 2">
+                                                        </div>
+                                                        <div class="style-label">TEMPLATE 2</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-3">
+                                                <div class="style-option" data-style="template3">
+                                                    <div class="style-card">
+                                                        <div class="style-image">
+                                                            <img src="/views/assets/template3.jpg" alt="Template 3">
+                                                        </div>
+                                                        <div class="style-label">TEMPLATE 3</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-3">
+                                                <div class="style-option" data-style="template4">
+                                                    <div class="style-card">
+                                                        <div class="style-image">
+                                                            <img src="/views/assets/template4.jpg" alt="Template 4">
+                                                        </div>
+                                                        <div class="style-label">TEMPLATE 4</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <input type="hidden" id="thumbnailStyle" name="thumbnailStyle" value="default">
+                                    </div>
+                                    
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-primary btn-lg">
+                                            <i class="fas fa-magic me-2"></i>Generate Thumbnail
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6><i class="fas fa-info-circle me-2"></i>Instructions</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-unstyled">
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Enter the title of video</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Enter the content of video</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Enter the subtitle of video</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Specify the week range</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Choose thumbnail style</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Click generate to create</li>
+                                </ul>
+                                
+                                <div class="alert alert-info mt-3">
+                                    <small><i class="fas fa-lightbulb me-1"></i>The thumbnail will be automatically generated</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Thumbnail Results Section -->
+                <div class="row mt-4" id="thumbnailResultsSection" style="display: none;">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6><i class="fas fa-images me-2"></i>Generated Thumbnails</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="thumbnailResults"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+
+    <!-- Comment Action Details Modal -->
+    <div class="modal fade" id="commentActionModal" tabindex="-1" aria-labelledby="commentActionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="commentActionModalLabel">Comment Action Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="commentActionDetails"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a id="viewVideoBtn" href="" target="_blank" class="btn btn-primary">
+                        <i class="fab fa-youtube me-2"></i>View on YouTube
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Processed Video Details Modal -->
+    <div class="modal fade" id="processedVideoModal" tabindex="-1" aria-labelledby="processedVideoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="processedVideoModalLabel">Processed Video Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="processedVideoDetails"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a id="viewProcessedVideoBtn" href="" target="_blank" class="btn btn-primary">
+                        <i class="fab fa-youtube me-2"></i>View on YouTube
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Thumbnail Modal -->
+    <div class="modal fade" id="thumbnailModal" tabindex="-1" aria-labelledby="thumbnailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="thumbnailModalLabel">Thumbnail Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalThumbnailImage" src="" alt="Thumbnail Preview" class="img-fluid rounded" style="max-width: 100%; max-height: 70vh;">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a id="downloadThumbnailBtn" href="" download="" class="btn btn-primary">
+                        <i class="fas fa-download me-2"></i>Download
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="/views/admin-dashboard.js"></script>
+</body>
+</html> 

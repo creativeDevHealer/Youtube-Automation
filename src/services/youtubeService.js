@@ -544,34 +544,137 @@ class YouTubeService {
     return `${baseUrl}${videoId}${timestampsParam}`;
   }
 
-  // Update video thumbnail
-  async updateVideoThumbnail(videoId, imageBuffer) {
-    await this.initialize();
+  /**
+   * Update video thumbnail
+   * @param {string} videoId - YouTube video ID
+   * @param {string} thumbnailPath - Path to the thumbnail image file
+   * @returns {Object} Result object with success status
+   */
+  async updateVideoThumbnail(videoId, thumbnailPath) {
     try {
-      logger.info(`Updating thumbnail for video: ${videoId}`);
-
-      // Use the YouTube API v3 thumbnails.set endpoint
-      const response = await this.youtube.thumbnails.set({
-        videoId: videoId,
-        media: {
-          mimeType: 'image/jpeg',
-          body: imageBuffer
-        }
-      });
-
-      logger.info(`Successfully updated thumbnail for video: ${videoId}`);
-      return { 
-        success: true, 
-        data: response.data,
-        thumbnailUrl: response.data.items?.[0]?.default?.url
-      };
+      const fs = require('fs');
+      const axios = require('axios');
       
+      await this.initialize();
+      
+      logger.info(`Updating thumbnail for video ${videoId}`);
+      
+      // Check if file exists
+      if (!fs.existsSync(thumbnailPath)) {
+        throw new Error(`Thumbnail file not found: ${thumbnailPath}`);
+      }
+
+      // Get file stats to check size (YouTube has a 2MB limit)
+      const stats = fs.statSync(thumbnailPath);
+      const fileSizeInMB = stats.size / (1024 * 1024);
+      
+      if (fileSizeInMB > 2) {
+        throw new Error(`Thumbnail file too large: ${fileSizeInMB.toFixed(2)}MB (max 2MB)`);
+      }
+
+      // Get access token
+      const auth = this.youtube.context._options.auth;
+      const accessToken = await auth.getAccessToken();
+
+      // Read the file as buffer for direct upload
+      const imageBuffer = fs.readFileSync(thumbnailPath);
+      
+      // Determine content type based on file extension
+      const path = require('path');
+      const fileExtension = path.extname(thumbnailPath).toLowerCase();
+      let contentType = 'image/jpeg'; // default
+      
+      switch (fileExtension) {
+        case '.png':
+          contentType = 'image/png';
+          break;
+        case '.jpg':
+        case '.jpeg':
+          contentType = 'image/jpeg';
+          break;
+        case '.gif':
+          contentType = 'image/gif';
+          break;
+        case '.bmp':
+          contentType = 'image/bmp';
+          break;
+      }
+
+      console.log('------------------------------');
+      console.log(`Uploading thumbnail for video ${videoId}`);
+      console.log(`File path: ${thumbnailPath}`);
+      console.log(`File size: ${fileSizeInMB.toFixed(2)}MB`);
+      console.log(`Content type: ${contentType}`);
+      console.log(`Buffer size: ${imageBuffer.length} bytes`);
+
+      // Make direct HTTP POST request to YouTube API with raw image data
+      const response = await axios.post(
+        `https://www.googleapis.com/upload/youtube/v3/thumbnails/set`,
+        imageBuffer,
+        {
+          params: {
+            videoId: videoId,
+            uploadType: 'media'
+          },
+          headers: {
+            'Authorization': `Bearer ${accessToken.token}`,
+            'Content-Type': contentType,
+            'Content-Length': imageBuffer.length
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          timeout: 30000 // 30 second timeout
+        }
+      );
+
+      if (response.status === 200) {
+        logger.info(`✅ Thumbnail updated successfully for video ${videoId}`);
+        console.log('Upload response:', response.data);
+        return {
+          success: true,
+          videoId: videoId,
+          data: response.data
+        };
+      } else {
+        throw new Error(`YouTube API returned status ${response.status}: ${response.statusText}`);
+      }
+
     } catch (error) {
-      logger.error(`Error updating thumbnail for video ${videoId}:`, error);
-      return { 
-        success: false, 
-        error: error.message,
-        details: error.response?.data
+      logger.error(`❌ Failed to update thumbnail for video ${videoId}:`, error.message);
+      
+      // Handle specific YouTube API errors
+      let errorMessage = error.message;
+      if (error.response) {
+        const status = error.response.status;
+        const responseData = error.response.data;
+        
+        console.log('Error response:', {
+          status,
+          statusText: error.response.statusText,
+          data: responseData
+        });
+        
+        if (status === 403) {
+          errorMessage = 'Permission denied. Check if the video belongs to the authenticated channel and has proper permissions.';
+        } else if (status === 404) {
+          errorMessage = 'Video not found. Check if the video ID is correct.';
+        } else if (status === 400) {
+          errorMessage = 'Invalid request. Check the thumbnail file format (should be JPG, GIF, BMP, or PNG).';
+        } else if (status === 401) {
+          errorMessage = 'Authentication failed. Please re-authenticate your YouTube account.';
+        } else {
+          errorMessage = `YouTube API error (${status}): ${responseData?.error?.message || error.message}`;
+        }
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Upload timeout. The thumbnail file may be too large or connection is slow.';
+      }
+
+      console.log(error);
+
+      return {
+        success: false,
+        error: errorMessage,
+        videoId: videoId
       };
     }
   }

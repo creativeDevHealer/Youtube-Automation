@@ -1,5 +1,6 @@
 const youtubeService = require('./youtubeService');
 const Video = require('../models/Video');
+const ProcessedVideo = require('../models/ProcessedVideo');
 const logger = require('../utils/logger');
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -19,7 +20,7 @@ class VideoAutomation {
       logger.info('Starting video automation cycle');
       
       // Get videos that are published on the latest date.
-      const videos = await youtubeService.getWeekVideos(process.env.YOUTUBE_CHANNEL_ID, 20);
+      const videos = await youtubeService.getWeekVideos(process.env.YOUTUBE_CHANNEL_ID, 50);
       
       if (videos.length === 0) {
         logger.info('No videos found on channel. Skipping video processing.');
@@ -77,6 +78,11 @@ class VideoAutomation {
   async processVideoTimestampsAndDescription(videoId, videoTitle, bonusId) {
     try {
       // Get detailed video information
+      let finalDescription = '';
+      let zodiacSign = '';
+      let timestamps = '';
+      let weekRange = '';
+      let pinnedComment = '';
       const videoInfo = await youtubeService.getVideoInfo(videoId);
       const videoDescription = videoInfo?.snippet?.description || '';
       const videoTags = videoInfo?.snippet?.tags || [];
@@ -93,7 +99,8 @@ class VideoAutomation {
         await youtubeService.downloadCaptions(videoId);
         const srtFileName = `captions-${videoId}.srt`;
         const zodiacTimeStamps = this.formatZodiacTimestamps(this.extractZodiacTimestampsFromSRT(srtFileName));
-        const finialDescription = videoTitle + '\n' + '\n' + zodiacTimeStamps + '\n' + '\n' + `Donations greatly appreciated!
+        timestamps = zodiacTimeStamps;
+        finalDescription = videoTitle + '\n' + '\n' + zodiacTimeStamps + '\n' + '\n' + `Donations greatly appreciated!
 Paypal
 https://www.paypal.com/donate/?hosted_button_id=QFALLQ7DZ27B4
 Venmo
@@ -163,16 +170,19 @@ Neptune In Aries 🚀 Why 2025 - 2027 Is Most Crucial For This 14-Year Transit -
 LEGAL DISCLAIMER:
 My tarot readings are for entertainment purposes only. I am an intuitive consultant using my knowledge of astrology, tarot, intuition and divination. I am not a medical professional, and I cannot give legal, financial, or medical advice. Viewers are responsible for how they view the videos, and their interpretations.` + ' BY AUTOMATION';
         
-        await youtubeService.updateVideoDescription(videoId, finialDescription);
+        // await youtubeService.updateVideoDescription(videoId, finalDescription);
       } else if(videoType === 'weekly_forecast') {
         const transcript = await youtubeService.getTranscript(videoId);
         const zodiac = this.capitalizeFirstLetter(this.detectZodiacSignforWeeklyVideo(videoTitle, transcript));
         const dateRange = this.extractWeekRange(videoTitle);
         const timestamp = this.detectTarotTransitionFromJson(transcript).timestamp;
+        timestamps = timestamp;
+        zodiacSign = zodiac;
+        weekRange = dateRange;
         const firstParagraph = `${zodiac}, I begin your forecast with a detailed astrology overview tailored to your sign, which adds more depth, insight and guidance, then your tarot reading: ${timestamp}. I’m proud to be the only astrologer, tarot reader, channeler/clairvoyant to merge these modalities so that you feel you’re receiving a very personalized reading. Check your tarot horoscope for love, career, spiritual growth and more ❤️ 
 
 ${dateRange} Extended Bonus Readings (All Signs) Really Good & Legendary - https://youtu.be/${bonusId}`;
-        const finialDescription = firstParagraph + '\n' + '\n' + `Consider becoming a member!
+        finalDescription = firstParagraph + '\n' + '\n' + `Consider becoming a member!
 https://www.youtube.com/channel/UCzlP6wa5y0dO5lKmcl6VBqA/join
 You receive access to wonderful perks (join the community in livestreams with me, bonus spreads, discounts on merch, etc), and your support allows me to continue offering weekly content! 😚🌠 Membership starts at $2/month. Thank you!
 
@@ -246,15 +256,35 @@ Neptune In Aries 🚀 Why 2025 - 2027 Is Most Crucial For This 14-Year Transit -
 LEGAL DISCLAIMER:
 My tarot readings are for entertainment purposes only. I am an intuitive consultant using my knowledge of astrology, tarot, intuition and divination. I am not a medical professional, and I cannot give legal, financial, or medical advice. Viewers are responsible for how they view the videos, and their interpretations.` + ' BY AUTOMATION';
         
-        await youtubeService.updateVideoDescription(videoId, finialDescription);
+        // await youtubeService.updateVideoDescription(videoId, finalDescription);
 
-        const pinnedComment = `${zodiac}, Your tarot reading starts at ${timestamp}, though I discuss what is happening astrologically for all ${zodiac} in the intro. ${dateRange} Extended Bonus Readings (All Signs) - Really Good & Legendary Members: https://youtu.be/${bonusId}`;
-        const commentExist = await youtubeService.checkIfVideoHasNoComments(videoId);
-        if(commentExist === true) {
-          await youtubeService.addTopLevelComment(videoId, pinnedComment);
-        }
+        // pinnedComment = `${zodiac}, Your tarot reading starts at ${timestamp}, though I discuss what is happening astrologically for all ${zodiac} in the intro. ${dateRange} Extended Bonus Readings (All Signs) - Really Good & Legendary Members: https://youtu.be/${bonusId}`;
+        // const commentExist = await youtubeService.checkIfVideoHasNoComments(videoId);
+        // if(commentExist === true) {
+        //   await youtubeService.addTopLevelComment(videoId, pinnedComment);
+        // }
       } else if(videoType === 'livestream') {
+      }
 
+      if(videoType === 'bonus_video' || videoType === 'weekly_forecast') {
+        try {
+          // Save processed video data to database
+          const processedVideoData = new ProcessedVideo({
+            videoId: videoId,
+            videoTitle: videoTitle,
+            videoType: videoType,
+            finalDescription: finalDescription,
+            zodiacSign: zodiacSign,
+            timestamps: timestamps,
+            weekRange: weekRange,
+            pinnedComment: pinnedComment
+          });
+          
+          await processedVideoData.save();
+          logger.info(`Saved processed video data for ${videoId} to database`);
+        } catch (error) {
+          logger.error(`Error saving processed video data for ${videoId}:`, error);
+        }
       }
       
     } catch (error) {

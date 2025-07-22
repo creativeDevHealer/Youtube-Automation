@@ -1,6 +1,7 @@
 const youtubeService = require('./youtubeService');
 const aiService = require('./aiService');
 const Comment = require('../models/Comment');
+const CommentAction = require('../models/CommentAction');
 const Member = require('../models/Member');
 const logger = require('../utils/logger');
 const keywords = require('../config/keywords');
@@ -81,9 +82,9 @@ class CommentAutomation {
       }
       
       this.membersList = members;
-      logger.info(`Loaded ${Object.keys(members).length} members from CSV`);
+      // logger.info(`Loaded ${Object.keys(members).length} members from CSV`);
     } catch (error) {
-      logger.error('Error loading members CSV:', error);
+      // logger.error('Error loading members CSV:', error);
       this.membersList = {};
     }
   }
@@ -132,28 +133,28 @@ class CommentAutomation {
   // Main comment processing function
   async processComments() {
     try {
-      logger.info('Starting comment automation cycle');
+      // logger.info('Starting comment automation cycle');
       
       // Get videos that are published on the latest date.
       // const videos = await youtubeService.getLastPublishedDateVideos(process.env.YOUTUBE_CHANNEL_ID, 5);
-      const videos = await youtubeService.getRecentVideos(process.env.YOUTUBE_CHANNEL_ID, 20)
+      const videos = await youtubeService.getRecentVideos(process.env.YOUTUBE_CHANNEL_ID, 50)
       
       // console.log(videos);
 
       if (videos.length === 0) {
-        logger.info('No videos found on channel. Skipping comment processing.');
+        // logger.info('No videos found on channel. Skipping comment processing.');
         return this.stats;
       }
       
       for (const video of videos) {
-        logger.info(`Processing comments for video: ${video.id}`);
+        // logger.info(`Processing comments for video: ${video.id}`);
         await this.processVideoComments(video.id, video.snippet.title);
       }
       
       logger.info(`Comment automation completed. Stats: ${JSON.stringify(this.stats)}`);
       return this.stats;
     } catch (error) {
-      logger.error('Error in comment automation:', error);
+      // logger.error('Error in comment automation:', error);
       throw error;
     }
   }
@@ -169,55 +170,16 @@ class CommentAutomation {
       // Get all comments for the video
       const comments = await youtubeService.getAllVideoComments(videoId);
       
-      // Create a filename with timestamp for the comments file
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `comments_${videoId}_${timestamp}.txt`;
-      const filepath = path.join(process.cwd(), 'comments', filename);
-      
-      // Ensure the comments directory exists
-      await fs.mkdir(path.join(process.cwd(), 'comments'), { recursive: true });
-      
-      // Prepare comment data for saving
-      let commentData = `Comments for Video ID: ${videoId}\n`;
-      commentData += `Extracted on: ${new Date().toLocaleString()}\n`;
-      commentData += `Total Comments: ${comments.length}\n`;
-      commentData += '='.repeat(80) + '\n\n';
-      
       // Extract comment text and ID from each comment
       for (const commentThread of comments) {
         const comment = commentThread.snippet.topLevelComment;
-        const commentId = comment.id;
-        const commentText = comment.snippet.textDisplay;
-        const authorName = comment.snippet.authorDisplayName;
-        const authorChannelUrl = comment.snippet.authorChannelUrl;
-        const authorChannelId = comment.snippet.authorChannelId?.value || null;
-        
-
-        // Get member info using channel ID
-        const memberInfo = this.getMemberInfo(authorChannelId);
-        
-        commentData += `Comment ID: ${commentId}\n`;
-        commentData += `Author: ${authorName}\n`;
-        if (memberInfo.name) {
-          commentData += `Member Name: ${memberInfo.name}\n`;
-        }
-        commentData += `Membership: ${memberInfo.tier}\n`;
-        commentData += `${authorChannelUrl}\n`;
-        commentData += `Text: ${commentText}\n`;
-        commentData += '-'.repeat(40) + '\n\n';
-
         // Process each comment through the automation system
         await this.processSingleComment(comment, videoId, videoTitle);
 
       }
       
-      // Save to notepad file
-      await fs.writeFile(filepath, commentData, 'utf8');
-      
-      logger.info(`Successfully saved ${comments.length} comments to ${filepath}`);
-      
     } catch (error) {
-      logger.error(`Error processing comments for video ${videoId}:`, error);
+      // logger.error(`Error processing comments for video ${videoId}:`, error);
       this.stats.errors++;
     }
   }
@@ -254,7 +216,7 @@ class CommentAutomation {
 
       // Analyze comment with AI
       const analysis = await aiService.analyzeComment(comment.snippet.textOriginal);
-      logger.debug(`AI analysis for comment ${comment.id}:`, analysis);
+      // logger.debug(`AI analysis for comment ${comment.id}:`, analysis);
       
       // Normalize detectedKeywords categories to lowercase
       if (analysis.detectedKeywords && Array.isArray(analysis.detectedKeywords)) {
@@ -283,7 +245,7 @@ class CommentAutomation {
       this.stats.processed++;
       
     } catch (error) {
-      logger.error(`Error processing comment ${comment.id}:`, error);
+      // logger.error(`Error processing comment ${comment.id}:`, error);
       this.stats.errors++;
     }
   }
@@ -371,11 +333,11 @@ class CommentAutomation {
             this.stats.deleted++;
             return; // Exit early if deleted
           } else if (!shouldDelete) {
-            logger.warn(`Flagging troll comment from ${commentRecord.memberStatus} member for manual review: ${commentRecord.commentId}`);
+            // logger.warn(`Flagging troll comment from ${commentRecord.memberStatus} member for manual review: ${commentRecord.commentId}`);
             actions.push({ action: 'flagged_only', reason: `Troll content from ${commentRecord.memberStatus} - manual review needed` });
           }
         } catch (error) {
-          logger.warn(`Failed to delete comment ${commentRecord.commentId}: ${error.message}`);
+          // logger.warn(`Failed to delete comment ${commentRecord.commentId}: ${error.message}`);
           actions.push({ action: 'delete_failed', reason: error.message });
         }
       }
@@ -446,7 +408,7 @@ class CommentAutomation {
           });
           this.stats.replied++;
         } catch (error) {
-          logger.warn(`Failed to reply to comment ${commentRecord.commentId}: ${error.message}`);
+          // logger.warn(`Failed to reply to comment ${commentRecord.commentId}: ${error.message}`);
           actions.push({ action: 'reply_failed', reason: error.message });
         }
       }
@@ -465,7 +427,7 @@ class CommentAutomation {
       commentRecord.automationActions = actions;
       
     } catch (error) {
-      logger.error('Error processing automation actions:', error);
+      // logger.error('Error processing automation actions:', error);
       actions.push({ action: 'error', reason: error.message });
     }
   }
@@ -482,13 +444,56 @@ class CommentAutomation {
     return Object.keys(keywords.websiteAccess).some(keyword => lowerText.includes(keyword.toLowerCase()));
   }
 
+  // Log comment action to CommentAction model
+  async logCommentAction(actionData) {
+    try {
+      // Get comment details if commentId is provided
+      let commentRecord = null;
+      if (actionData.commentId) {
+        commentRecord = await Comment.findOne({ commentId: actionData.commentId });
+      }
+
+      const commentActionData = {
+        videoId: actionData.videoId,
+        videoTitle: actionData.videoTitle,
+        commentId: actionData.commentId,
+        commentText: actionData.commentText || (commentRecord ? commentRecord.textDisplay : 'N/A'),
+        repliedComment: actionData.repliedComment || null,
+        processedAt: actionData.processedAt || new Date(),
+        actionType: actionData.actionType,
+        authorDisplayName: actionData.authorDisplayName || (commentRecord ? commentRecord.authorDisplayName : null),
+        authorChannelId: actionData.authorChannelId || (commentRecord ? commentRecord.authorChannelId : null),
+        memberStatus: actionData.memberStatus || (commentRecord ? commentRecord.memberStatus : 'none'),
+        reason: actionData.reason || null
+      };
+
+      const commentAction = new CommentAction(commentActionData);
+      await commentAction.save();
+      
+      // logger.info(`Logged ${actionData.actionType} action for comment ${actionData.commentId}`);
+    } catch (error) {
+      // Don't throw here as we don't want logging failures to break the main action
+      // logger.error('Error logging comment action:', error);
+    }
+  }
+
   // Delete a comment
   async deleteComment(videoId, videoTitle, commentId, reason) {
     try {
-      await youtubeService.rejectComment(videoId, videoTitle, commentId);
-      logger.info(`Deleted comment ${commentId}: ${reason} VideoTitle: ${videoTitle} : ${videoId}` );
+      // await youtubeService.rejectComment(videoId, videoTitle, commentId);
+      
+      // Log the action to CommentAction model
+      await this.logCommentAction({
+        videoId,
+        videoTitle,
+        commentId,
+        actionType: 'deleted',
+        reason,
+      });
+      
+      // logger.info(`Deleted comment ${commentId}: ${reason} VideoTitle: ${videoTitle} : ${videoId}` );
     } catch (error) {
-      logger.error(`Error deleting comment ${commentId}:`, error);
+      // logger.error(`Error deleting comment ${commentId}:`, error);
       throw error;
     }
   }
@@ -498,13 +503,13 @@ class CommentAutomation {
     try {
       const result = await youtubeService.likeComment(commentId);
       if (result.success === false) {
-        logger.warn(`Cannot like comment ${commentId}: ${result.reason}`);
+        // logger.warn(`Cannot like comment ${commentId}: ${result.reason}`);
         return { success: false, reason: result.reason };
       }
-      logger.info(`Liked comment ${commentId}`);
+      // logger.info(`Liked comment ${commentId}`);
       return { success: true };
     } catch (error) {
-      logger.error(`Error liking comment ${commentId}:`, error);
+      // logger.error(`Error liking comment ${commentId}:`, error);
       throw error;
     }
   }
@@ -512,10 +517,20 @@ class CommentAutomation {
   // Reply to a comment
   async replyToComment(videoId, videoTitle, commentId, replyText) {
     try {
-      await youtubeService.replyToComment(videoId, commentId, replyText);
-      logger.info(`Replied to comment ${commentId}: ${replyText} VideoTitle: ${videoTitle}, ${videoId}`);
+      // await youtubeService.replyToComment(videoId, commentId, replyText);
+      
+      // Log the action to CommentAction model
+      await this.logCommentAction({
+        videoId,
+        videoTitle,
+        commentId,
+        actionType: 'replied',
+        repliedComment: replyText
+      });
+      
+      // logger.info(`Replied to comment ${commentId}: ${replyText} VideoTitle: ${videoTitle}, ${videoId}`);
     } catch (error) {
-      logger.error(`Error replying to comment ${commentId}:`, error);
+      // logger.error(`Error replying to comment ${commentId}:`, error);
       throw error;
     }
   }
@@ -536,10 +551,10 @@ class CommentAutomation {
 
       // Send email alert
       // await this.sendAlertEmail(commentRecord, alertKeywords);
-      logger.info(`Alert triggered for comment ${commentRecord.commentId}: ${JSON.stringify(alertKeywords)}`);
+      // logger.info(`Alert triggered for comment ${commentRecord.commentId}: ${JSON.stringify(alertKeywords)}`);
       
     } catch (error) {
-      logger.error('Error triggering alert:', error);
+      // logger.error('Error triggering alert:', error);
     }
   }
 
@@ -547,7 +562,7 @@ class CommentAutomation {
   async sendAlertEmail(commentRecord, alertKeywords) {
     try {
       if (!this.emailTransporter) {
-        logger.info('Email not configured. Skipping alert email.');
+        // logger.info('Email not configured. Skipping alert email.');
         return;
       }
 
@@ -567,9 +582,9 @@ class CommentAutomation {
       };
 
       await this.emailTransporter.sendMail(mailOptions);
-      logger.info('Alert email sent successfully');
+      // logger.info('Alert email sent successfully');
     } catch (error) {
-      logger.error('Error sending alert email:', error);
+      // logger.error('Error sending alert email:', error);
     }
   }
 
@@ -676,10 +691,10 @@ class CommentAutomation {
       commentRecord.superfanScore = scoreIncrease;
       commentRecord.isSuperfan = member.isSuperfan;
       
-      logger.info(`Updated superfan score for ${member.displayName}: +${scoreIncrease} (Total: ${member.superfanScore})`);
+      // logger.info(`Updated superfan score for ${member.displayName}: +${scoreIncrease} (Total: ${member.superfanScore})`);
       
     } catch (error) {
-      logger.error('Error updating superfan score:', error);
+      // logger.error('Error updating superfan score:', error);
     }
   }
 
