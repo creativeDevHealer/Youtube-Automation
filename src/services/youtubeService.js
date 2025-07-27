@@ -700,6 +700,77 @@ class YouTubeService {
       return { success: false, error: error.message };
     }
   }
+
+  async refreshAccessToken() {
+    try {
+      logger.info('Starting YouTube access token refresh');
+      
+      // Load current token to get refresh_token
+      if (!fs.existsSync(TOKEN_PATH)) {
+        throw new Error('Token file not found. Please run authorization first.');
+      }
+      
+      const currentToken = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8'));
+      
+      if (!currentToken.refresh_token) {
+        throw new Error('No refresh token found in token file.');
+      }
+
+      // Load client secrets
+      const credentials = JSON.parse(fs.readFileSync(CLIENT_SECRET_PATH, 'utf8'));
+      
+      // Handle different client secret file structures
+      let client_secret, client_id, redirect_uris;
+      
+      if (credentials.installed) {
+        ({ client_secret, client_id, redirect_uris } = credentials.installed);
+      } else if (credentials.web) {
+        ({ client_secret, client_id, redirect_uris } = credentials.web);
+      } else {
+        ({ client_secret, client_id, redirect_uris } = credentials);
+      }
+      
+      // Create OAuth2 client
+      const oAuth2Client = new google.auth.OAuth2(
+        client_id, client_secret, redirect_uris ? redirect_uris[0] : 'http://localhost'
+      );
+
+      // Set the refresh token
+      oAuth2Client.setCredentials({
+        refresh_token: currentToken.refresh_token
+      });
+
+      // Get new access token
+      const { credentials: newCredentials } = await oAuth2Client.refreshAccessToken();
+      
+      // Update the token file with new credentials
+      const updatedToken = {
+        ...currentToken,
+        access_token: newCredentials.access_token,
+        expiry_date: newCredentials.expiry_date || (Date.now() + 3600 * 1000) // 1 hour from now
+      };
+      
+      // Save updated token
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(updatedToken, null, 2));
+      
+      // Update the service's OAuth2 client if it's already initialized
+      if (this.oAuth2Client) {
+        this.oAuth2Client.setCredentials(updatedToken);
+      }
+      
+      logger.info('YouTube access token refreshed successfully');
+      
+      return {
+        success: true,
+        access_token: newCredentials.access_token,
+        expiry_date: updatedToken.expiry_date
+      };
+      
+    } catch (error) {
+      logger.error('Error refreshing YouTube access token:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new YouTubeService(); 
