@@ -170,7 +170,7 @@ Neptune In Aries 🚀 Why 2025 - 2027 Is Most Crucial For This 14-Year Transit -
 LEGAL DISCLAIMER:
 My tarot readings are for entertainment purposes only. I am an intuitive consultant using my knowledge of astrology, tarot, intuition and divination. I am not a medical professional, and I cannot give legal, financial, or medical advice. Viewers are responsible for how they view the videos, and their interpretations.` + ' BY AUTOMATION';
         
-        // await youtubeService.updateVideoDescription(videoId, finalDescription);
+        await youtubeService.updateVideoDescription(videoId, finalDescription);
       } else if(videoType === 'weekly_forecast') {
         const transcript = await youtubeService.getTranscript(videoId);
         const zodiac = this.capitalizeFirstLetter(this.detectZodiacSignforWeeklyVideo(videoTitle, transcript));
@@ -256,13 +256,13 @@ Neptune In Aries 🚀 Why 2025 - 2027 Is Most Crucial For This 14-Year Transit -
 LEGAL DISCLAIMER:
 My tarot readings are for entertainment purposes only. I am an intuitive consultant using my knowledge of astrology, tarot, intuition and divination. I am not a medical professional, and I cannot give legal, financial, or medical advice. Viewers are responsible for how they view the videos, and their interpretations.` + ' BY AUTOMATION';
         
-        // await youtubeService.updateVideoDescription(videoId, finalDescription);
+        await youtubeService.updateVideoDescription(videoId, finalDescription);
 
-        // pinnedComment = `${zodiac}, Your tarot reading starts at ${timestamp}, though I discuss what is happening astrologically for all ${zodiac} in the intro. ${dateRange} Extended Bonus Readings (All Signs) - Really Good & Legendary Members: https://youtu.be/${bonusId}`;
-        // const commentExist = await youtubeService.checkIfVideoHasNoComments(videoId);
-        // if(commentExist === true) {
-        //   await youtubeService.addTopLevelComment(videoId, pinnedComment);
-        // }
+        pinnedComment = `${zodiac}, Your tarot reading starts at ${timestamp}, though I discuss what is happening astrologically for all ${zodiac} in the intro. ${dateRange} Extended Bonus Readings (All Signs) - Really Good & Legendary Members: https://youtu.be/${bonusId}`;
+        const commentExist = await youtubeService.checkIfVideoHasNoComments(videoId);
+        if(commentExist === true) {
+          await youtubeService.addTopLevelComment(videoId, pinnedComment);
+        }
       } else if(videoType === 'livestream') {
       }
 

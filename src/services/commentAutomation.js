@@ -480,7 +480,7 @@ class CommentAutomation {
   // Delete a comment
   async deleteComment(videoId, videoTitle, commentId, reason) {
     try {
-      // await youtubeService.rejectComment(videoId, videoTitle, commentId);
+      await youtubeService.rejectComment(videoId, videoTitle, commentId);
       
       // Log the action to CommentAction model
       await this.logCommentAction({
@@ -517,7 +517,7 @@ class CommentAutomation {
   // Reply to a comment
   async replyToComment(videoId, videoTitle, commentId, replyText) {
     try {
-      // await youtubeService.replyToComment(videoId, commentId, replyText);
+      await youtubeService.replyToComment(videoId, commentId, replyText);
       
       // Log the action to CommentAction model
       await this.logCommentAction({
