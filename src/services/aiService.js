@@ -92,7 +92,7 @@ Return only valid JSON with this structure:
 
       const analysis = JSON.parse(content);
       
-      logger.info(`Comment analyzed: ${commentText.substring(0, 50)}...`);
+      // logger.info(`Comment analyzed: ${commentText.substring(0, 50)}...`);
       
       return analysis;
     } catch (error) {
