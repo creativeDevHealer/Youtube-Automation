@@ -287,12 +287,7 @@ class CommentAutomation {
       }
     }
     
-    // Check website access issues
-    for (const [keyword, response] of Object.entries(keywords.websiteAccess)) {
-      if (lowerText.includes(keyword.toLowerCase())) {
-        return response;
-      }
-    }
+
     
     return null;
   }
@@ -437,13 +432,6 @@ class CommentAutomation {
     const lowerText = text.toLowerCase();
     return keywords.alerts.some(keyword => lowerText.includes(keyword.toLowerCase()));
   }
-
-  // Check for website access keywords
-  hasWebsiteAccessKeywords(text) {
-    const lowerText = text.toLowerCase();
-    return Object.keys(keywords.websiteAccess).some(keyword => lowerText.includes(keyword.toLowerCase()));
-  }
-
   // Log comment action to CommentAction model
   async logCommentAction(actionData) {
     try {
@@ -664,7 +652,6 @@ class CommentAutomation {
       if (this.getMilestoneResponse(commentText)) scoreIncrease += 10;
       if (this.isPraiseComment(commentText)) scoreIncrease += 15;
       if (this.hasAlertKeywords(commentText)) scoreIncrease += 20;
-      if (this.hasWebsiteAccessKeywords(commentText)) scoreIncrease += 5;
       
       // Engagement bonus (if comment gets hearts/likes)
       scoreIncrease += (commentRecord.likeCount || 0) * 2;
@@ -681,9 +668,7 @@ class CommentAutomation {
       if (this.isPraiseComment(commentText)) member.keywordMentions.praise += 1;
       if (analysis.sentiment?.label === 'positive') member.keywordMentions.positive += 1;
       if (analysis.sentiment?.label === 'negative') member.keywordMentions.negative += 1;
-      if (this.hasWebsiteAccessKeywords(commentText)) {
-        member.keywordMentions.websiteAccess = (member.keywordMentions.websiteAccess || 0) + 1;
-      }
+      
       
       await member.save();
       
