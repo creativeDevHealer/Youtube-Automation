@@ -183,6 +183,14 @@ function loadStats() {
 
 // Initialize DataTables
 function initializeDataTables() {
+    // Check if DataTable instances already exist and destroy them
+    if ($.fn.DataTable.isDataTable('#commentActionsTable')) {
+        $('#commentActionsTable').DataTable().destroy();
+    }
+    if ($.fn.DataTable.isDataTable('#processedVideosTable')) {
+        $('#processedVideosTable').DataTable().destroy();
+    }
+    
     // Comment Actions Table
     commentActionsTable = $('#commentActionsTable').DataTable({
         processing: true,

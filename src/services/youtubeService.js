@@ -37,14 +37,20 @@ class YouTubeService {
       this.oAuth2Client = new google.auth.OAuth2(
         client_id, client_secret, redirect_uris ? redirect_uris[0] : 'http://localhost'
       );
-      // Load token
+      
+      // Load token and ensure it's valid (proactive refresh)
       if (fs.existsSync(TOKEN_PATH)) {
+        // Ensure token is valid before setting credentials
+        await this.ensureValidToken();
+        
+        // Load the potentially refreshed token
         const token = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8'));
         this.oAuth2Client.setCredentials(token);
       } else {
         logger.error('OAuth2 token.json not found. Please run the authorization script to generate it.');
         throw new Error('OAuth2 token.json not found.');
       }
+      
       this.youtube = google.youtube({ version: 'v3', auth: this.oAuth2Client });
       this.initialized = true;
       logger.info('YouTube API initialized successfully with OAuth2');
@@ -54,10 +60,99 @@ class YouTubeService {
     }
   }
 
+  isTokenExpired(expiryDate) {
+    const now = Date.now();
+    const bufferTime = 5 * 60 * 1000; // 5 minutes buffer
+    return now >= (expiryDate - bufferTime);
+  }
+
+  isTokenExpiringSoon(expiryDate, bufferMinutes = 15) {
+    const now = Date.now();
+    const bufferTime = bufferMinutes * 60 * 1000; // Convert minutes to milliseconds
+    return now >= (expiryDate - bufferTime);
+  }
+
+  async ensureValidToken() {
+    try {
+      if (!fs.existsSync(TOKEN_PATH)) {
+        throw new Error('Token file not found. Please run authorization first.');
+      }
+
+      const token = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8'));
+      
+      if (!token.expiry_date) {
+        logger.warn('No expiry date found in token, refreshing to get one...');
+        await this.refreshAccessToken();
+        return;
+      }
+
+      // Check if token is expired or expiring soon (within 15 minutes)
+      if (this.isTokenExpiringSoon(token.expiry_date, 15)) {
+        logger.info('Token is expiring soon, refreshing proactively...');
+        await this.refreshAccessToken();
+      } else {
+        logger.info('Token is still valid, no refresh needed');
+      }
+    } catch (error) {
+      logger.error('Error ensuring valid token:', error);
+      throw error;
+    }
+  }
+
+  getTokenStatus() {
+    try {
+      if (!fs.existsSync(TOKEN_PATH)) {
+        return { exists: false, error: 'Token file not found' };
+      }
+
+      const token = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8'));
+      const now = Date.now();
+      
+      if (!token.expiry_date) {
+        return {
+          exists: true,
+          hasExpiry: false,
+          status: 'unknown',
+          message: 'No expiry date found'
+        };
+      }
+
+      const timeLeft = token.expiry_date - now;
+      const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+      const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+      
+      let status = 'valid';
+      let message = `Valid for ${hours}h ${minutes}m`;
+      
+      if (this.isTokenExpired(token.expiry_date)) {
+        status = 'expired';
+        message = 'Token has expired';
+      } else if (this.isTokenExpiringSoon(token.expiry_date, 15)) {
+        status = 'expiring_soon';
+        message = `Expiring soon (${hours}h ${minutes}m left)`;
+      }
+
+      return {
+        exists: true,
+        hasExpiry: true,
+        status,
+        message,
+        expiryDate: new Date(token.expiry_date).toLocaleString(),
+        timeLeftMs: timeLeft,
+        timeLeftFormatted: `${hours}h ${minutes}m`
+      };
+    } catch (error) {
+      return { exists: false, error: error.message };
+    }
+  }
+
   // Get channel information
   async getChannelInfo(channelId) {
     await this.initialize();
     try {
+      // Ensure token is valid before making API call
+      await this.ensureValidToken();
+      
       const response = await this.youtube.channels.list({
         part: ['snippet', 'statistics', 'brandingSettings'],
         id: [channelId]
@@ -743,6 +838,8 @@ class YouTubeService {
       // Get new access token
       const { credentials: newCredentials } = await oAuth2Client.refreshAccessToken();
       
+      console.log(newCredentials);
+
       // Update the token file with new credentials
       const updatedToken = {
         ...currentToken,
@@ -758,12 +855,21 @@ class YouTubeService {
         this.oAuth2Client.setCredentials(updatedToken);
       }
       
-      logger.info('YouTube access token refreshed successfully');
+      // Log detailed expiry information
+      const expiryDate = new Date(updatedToken.expiry_date);
+      const now = new Date();
+      const timeLeft = updatedToken.expiry_date - now.getTime();
+      const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+      const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+      
+      logger.info(`YouTube access token refreshed successfully. Expires: ${expiryDate.toLocaleString()} (${hours}h ${minutes}m from now)`);
       
       return {
         success: true,
         access_token: newCredentials.access_token,
-        expiry_date: updatedToken.expiry_date
+        expiry_date: updatedToken.expiry_date,
+        expires_in: timeLeft,
+        formatted_expiry: expiryDate.toLocaleString()
       };
       
     } catch (error) {
