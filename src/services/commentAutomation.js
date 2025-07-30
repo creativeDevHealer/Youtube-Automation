@@ -328,7 +328,7 @@ class CommentAutomation {
             this.stats.deleted++;
             return; // Exit early if deleted
           } else if (!shouldDelete) {
-            // logger.warn(`Flagging troll comment from ${commentRecord.memberStatus} member for manual review: ${commentRecord.commentId}`);
+            logger.warn(`Flagging troll comment from ${commentRecord.memberStatus} member for manual review: ${commentRecord.commentId}`);
             actions.push({ action: 'flagged_only', reason: `Troll content from ${commentRecord.memberStatus} - manual review needed` });
           }
         } catch (error) {
@@ -458,7 +458,7 @@ class CommentAutomation {
       const commentAction = new CommentAction(commentActionData);
       await commentAction.save();
       
-      // logger.info(`Logged ${actionData.actionType} action for comment ${actionData.commentId}`);
+      logger.info(`Logged ${actionData.actionType} action for comment ${actionData.commentId}`);
     } catch (error) {
       // Don't throw here as we don't want logging failures to break the main action
       // logger.error('Error logging comment action:', error);
@@ -539,7 +539,7 @@ class CommentAutomation {
 
       // Send email alert
       // await this.sendAlertEmail(commentRecord, alertKeywords);
-      // logger.info(`Alert triggered for comment ${commentRecord.commentId}: ${JSON.stringify(alertKeywords)}`);
+      logger.info(`Alert triggered for comment ${commentRecord.commentId}: ${JSON.stringify(alertKeywords)}`);
       
     } catch (error) {
       // logger.error('Error triggering alert:', error);
@@ -676,7 +676,7 @@ class CommentAutomation {
       commentRecord.superfanScore = scoreIncrease;
       commentRecord.isSuperfan = member.isSuperfan;
       
-      // logger.info(`Updated superfan score for ${member.displayName}: +${scoreIncrease} (Total: ${member.superfanScore})`);
+      logger.info(`Updated superfan score for ${member.displayName}: +${scoreIncrease} (Total: ${member.superfanScore})`);
       
     } catch (error) {
       // logger.error('Error updating superfan score:', error);
