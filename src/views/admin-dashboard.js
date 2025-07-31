@@ -1,6 +1,7 @@
 let apiKey = localStorage.getItem('adminApiKey');
 let commentActionsTable;
 let processedVideosTable;
+let superfansTable;
 
 // Initialize on document ready
 $(document).ready(function() {
@@ -64,6 +65,9 @@ function setupMobileMenu() {
             if (hash === 'processed-videos' && processedVideosTable) {
                 processedVideosTable.columns.adjust().draw();
             }
+            if (hash === 'superfans' && superfansTable) {
+                superfansTable.columns.adjust().draw();
+            }
         }, 100);
     }
 
@@ -120,7 +124,9 @@ function loadStats() {
                 repliedCommentCount: data.repliedCommentCount || 0,
                 deletedCommentCount: data.deletedCommentCount || 0,
                 bonusVideoCount: data.bonusVideoCount || 0,
-                weeklyVideoCount: data.weeklyVideoCount || 0
+                weeklyVideoCount: data.weeklyVideoCount || 0,
+                totalSuperfans: data.totalSuperfans || 0,
+                activeSuperfans: data.activeSuperfans || 0
             };
 
             const statsHtml = `
@@ -164,6 +170,26 @@ function loadStats() {
                     <p class="stat-value">${stats.weeklyVideoCount.toLocaleString()}</p>
                     <p class="stat-change">Weekly forecast videos</p>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <p class="stat-title">Total Superfans</p>
+                        <div class="stat-icon success">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                    </div>
+                    <p class="stat-value">${stats.totalSuperfans.toLocaleString()}</p>
+                    <p class="stat-change">Engaged community members</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <p class="stat-title">Active Superfans</p>
+                        <div class="stat-icon primary">
+                            <i class="fas fa-fire"></i>
+                        </div>
+                    </div>
+                    <p class="stat-value">${stats.activeSuperfans.toLocaleString()}</p>
+                    <p class="stat-change">Recently active superfans</p>
+                </div>
             `;
             $('#statsCards').html(statsHtml);
         },
@@ -189,6 +215,9 @@ function initializeDataTables() {
     }
     if ($.fn.DataTable.isDataTable('#processedVideosTable')) {
         $('#processedVideosTable').DataTable().destroy();
+    }
+    if ($.fn.DataTable.isDataTable('#superfansTable')) {
+        $('#superfansTable').DataTable().destroy();
     }
     
     // Comment Actions Table
@@ -390,6 +419,125 @@ function initializeDataTables() {
             searchPlaceholder: "Search videos...",
             processing: "Loading...",
             emptyTable: "No processed videos found",
+            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+            infoEmpty: "Showing 0 to 0 of 0 entries",
+            infoFiltered: "(filtered from _MAX_ total entries)"
+        }
+    });
+
+    // Superfans Table
+    superfansTable = $('#superfansTable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: '/admin/superfans',
+            type: 'GET',
+            headers: { 'X-API-Key': apiKey },
+            data: function(d) {
+                return d;
+            },
+            dataSrc: function(json) {
+                return json.data;
+            },
+            error: function(xhr, error, thrown) {
+                console.error('DataTables error (superfans):', error, thrown);
+                console.error('Response:', xhr.responseText);
+                console.error('Status:', xhr.status);
+            }
+        },
+        columns: [
+            { 
+                data: 0, 
+                name: 'displayName',
+                title: 'Display Name', 
+                orderable: true,
+                searchable: true
+            },
+            { 
+                data: 1, 
+                name: 'superfanScore',
+                title: 'Superfan Score',
+                orderable: true,
+                searchable: false,
+                render: function(data) {
+                    const score = parseInt(data) || 0;
+                    let badgeClass = 'bg-secondary';
+                    if (score >= 100) badgeClass = 'bg-success';
+                    else if (score >= 50) badgeClass = 'bg-warning';
+                    else if (score >= 25) badgeClass = 'bg-info';
+                    return `<span class="badge ${badgeClass}">${score}</span>`;
+                }
+            },
+            { 
+                data: 2, 
+                name: 'membershipLevel',
+                title: 'Membership Level',
+                orderable: true,
+                searchable: true,
+                render: function(data) {
+                    const level = data || 'none';
+                    const badgeMap = {
+                        'tier3': 'bg-danger',
+                        'tier2': 'bg-warning',
+                        'tier1': 'bg-info',
+                        'none': 'bg-secondary'
+                    };
+                    const badgeClass = badgeMap[level] || 'bg-secondary';
+                    return `<span class="badge ${badgeClass}">${level.toUpperCase()}</span>`;
+                }
+            },
+            { 
+                data: 3, 
+                name: 'totalComments',
+                title: 'Total Comments',
+                orderable: true,
+                searchable: false
+            },
+            { 
+                data: 4, 
+                name: 'lastCommentAt',
+                title: 'Last Comment',
+                orderable: true,
+                searchable: false
+            },
+            { 
+                data: 5, 
+                name: 'memberSince',
+                title: 'Member Since',
+                orderable: true,
+                searchable: false
+            },
+            { 
+                data: 6, 
+                name: 'isActive',
+                title: 'Status',
+                orderable: true,
+                searchable: false,
+                render: function(data) {
+                    return data; // HTML badges are already formatted in the server response
+                }
+            },
+            { 
+                data: 7, 
+                name: 'actions',
+                title: 'Actions',
+                orderable: false,
+                searchable: false,
+                render: function(data) {
+                    return data; // HTML buttons are already formatted in the server response
+                }
+            }
+        ],
+        order: [[1, 'desc']], // Sort by superfan score descending
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        responsive: true,
+        searchDelay: 500,
+        language: {
+            search: "_INPUT_",
+            searchPlaceholder: "Search superfans...",
+            processing: "Loading...",
+            emptyTable: "No superfans found",
             info: "Showing _START_ to _END_ of _TOTAL_ entries",
             infoEmpty: "Showing 0 to 0 of 0 entries",
             infoFiltered: "(filtered from _MAX_ total entries)"
@@ -909,6 +1057,114 @@ function showProcessedVideoDetails(data) {
     $('#processedVideoModal').modal('show');
 }
 
+// Superfan Functions
+function viewSuperfan(memberId) {
+    $.ajax({
+        url: `/admin/superfan/${memberId}`,
+        headers: { 'X-API-Key': apiKey },
+        success: function(data) {
+            showSuperfanDetails(data);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error fetching superfan:', error);
+            showNotification('Failed to load superfan details', 'error');
+        }
+    });
+}
 
+function viewSuperfanComments(channelId) {
+    $.ajax({
+        url: `/admin/superfan-comments/${channelId}`,
+        headers: { 'X-API-Key': apiKey },
+        success: function(data) {
+            showSuperfanComments(data);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error fetching superfan comments:', error);
+            showNotification('Failed to load superfan comments', 'error');
+        }
+    });
+}
+
+function showSuperfanDetails(data) {
+    const detailsHtml = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Basic Information</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Display Name:</strong></td><td>${data.displayName}</td></tr>
+                    <tr><td><strong>Channel ID:</strong></td><td><code>${data.channelId}</code></td></tr>
+                    <tr><td><strong>Member Since:</strong></td><td>${new Date(data.memberSince).toLocaleDateString()}</td></tr>
+                    <tr><td><strong>Status:</strong></td><td>${data.isActive ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Inactive</span>'}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Engagement Metrics</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Superfan Score:</strong></td><td><span class="badge bg-success">${data.superfanScore || 0}</span></td></tr>
+                    <tr><td><strong>Membership Level:</strong></td><td><span class="badge bg-primary">${data.membershipLevel || 'none'}</span></td></tr>
+                    <tr><td><strong>Total Comments:</strong></td><td>${data.totalComments || 0}</td></tr>
+                    <tr><td><strong>Last Comment:</strong></td><td>${data.lastCommentAt ? new Date(data.lastCommentAt).toLocaleString() : 'Never'}</td></tr>
+                </table>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <h6>Keyword Mentions</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Milestone:</strong></td><td>${data.keywordMentions?.milestone || 0}</td></tr>
+                    <tr><td><strong>Ruby:</strong></td><td>${data.keywordMentions?.ruby || 0}</td></tr>
+                    <tr><td><strong>Positive:</strong></td><td>${data.keywordMentions?.positive || 0}</td></tr>
+                    <tr><td><strong>Negative:</strong></td><td>${data.keywordMentions?.negative || 0}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Sentiment Analysis</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Average Sentiment:</strong></td><td>${data.averageSentiment || 0}</td></tr>
+                    <tr><td><strong>Positive Comments:</strong></td><td>${data.positiveCommentCount || 0}</td></tr>
+                    <tr><td><strong>Negative Comments:</strong></td><td>${data.negativeCommentCount || 0}</td></tr>
+                    <tr><td><strong>Engagement Score:</strong></td><td>${data.engagementScore || 0}</td></tr>
+                </table>
+            </div>
+        </div>
+        ${data.adminNotes ? `
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h6>Admin Notes</h6>
+                    <div class="alert alert-info">
+                        <p class="mb-0">${data.adminNotes}</p>
+                    </div>
+                </div>
+            </div>
+        ` : ''}
+    `;
+    
+    $('#superfanDetails').html(detailsHtml);
+    $('#superfanModal').modal('show');
+}
+
+function showSuperfanComments(data) {
+    const commentsHtml = data.comments.map(comment => `
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <small class="text-muted">${new Date(comment.publishedAt).toLocaleString()}</small>
+                <span class="badge ${comment.sentiment?.label === 'positive' ? 'bg-success' : comment.sentiment?.label === 'negative' ? 'bg-danger' : 'bg-secondary'}">
+                    ${comment.sentiment?.label || 'neutral'}
+                </span>
+            </div>
+            <div class="card-body">
+                <p class="card-text">${comment.textDisplay}</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">Video: ${comment.videoTitle}</small>
+                    <small class="text-muted">Likes: ${comment.likeCount || 0}</small>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    $('#superfanComments').html(commentsHtml);
+    $('#superfanCommentsModal').modal('show');
+}
 
  

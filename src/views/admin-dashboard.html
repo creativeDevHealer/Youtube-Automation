@@ -71,6 +71,11 @@
                 </a>
             </div>
             <div class="nav-item">
+                <a href="#superfans" class="nav-link" data-section="superfans">
+                    <i class="fas fa-star"></i>Superfans
+                </a>
+            </div>
+            <div class="nav-item">
                 <a href="#thumbnail-update" class="nav-link" data-section="thumbnail-update">
                     <i class="fas fa-image"></i>Thumbnail Update
                 </a>
@@ -135,6 +140,30 @@
                             <th>Zodiac</th>
                             <th>Week</th>
                             <th>Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+
+        <!-- Superfans Section -->
+        <div id="superfans-section" class="content-section d-none">
+            <div class="section-header">
+                <h2 class="section-title">Superfans</h2>
+                <p class="section-subtitle">Track and manage your most engaged community members</p>
+            </div>
+            <div class="table-container">
+                <table id="superfansTable" class="table" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Display Name</th>
+                            <th>Superfan Score</th>
+                            <th>Membership Level</th>
+                            <th>Total Comments</th>
+                            <th>Last Comment</th>
+                            <th>Member Since</th>
+                            <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -338,6 +367,42 @@
                     <a id="downloadThumbnailBtn" href="" download="" class="btn btn-primary">
                         <i class="fas fa-download me-2"></i>Download
                     </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Superfan Details Modal -->
+    <div class="modal fade" id="superfanModal" tabindex="-1" aria-labelledby="superfanModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="superfanModalLabel">Superfan Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="superfanDetails"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Superfan Comments Modal -->
+    <div class="modal fade" id="superfanCommentsModal" tabindex="-1" aria-labelledby="superfanCommentsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="superfanCommentsModalLabel">Superfan Comments</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="superfanComments"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>

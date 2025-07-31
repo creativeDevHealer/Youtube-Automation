@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const CommentAction = require('../models/CommentAction');
 const ProcessedVideo = require('../models/ProcessedVideo');
+const Member = require('../models/Member');
 const logger = require('../utils/logger');
 const path = require('path');
 const canvaService = require('../services/canvaService');
@@ -273,6 +274,159 @@ router.get('/processed-videos', async (req, res) => {
   }
 });
 
+// API endpoint for Superfans - DataTables compatible
+router.get('/superfans', async (req, res) => {
+  try {
+    // Debug: Log all query parameters
+    logger.info('Superfans API called with params:', req.query);
+    
+    // Extract parameters with multiple possible formats
+    const draw = parseInt(req.query.draw) || 1;
+    const start = parseInt(req.query.start) || 0;
+    const length = parseInt(req.query.length) || 10;
+    const searchValue = req.query['search[value]'] || req.query.search?.value || '';
+    const orderColumn = parseInt(req.query['order[0][column]']) || 0;
+    const orderDir = req.query['order[0][dir]'] || 'desc';
+    
+    // Debug: Log extracted values
+    logger.info('Extracted parameters:', {
+      draw, start, length, searchValue, orderColumn, orderDir
+    });
+
+    // Define column mapping for sorting
+    const columns = [
+      'displayName',
+      'superfanScore',
+      'membershipLevel',
+      'totalComments',
+      'lastCommentAt',
+      'memberSince',
+      'isActive',
+      'actions' // Not sortable
+    ];
+
+    // Build search query
+    let searchQuery = {};
+    if (searchValue && searchValue.trim() && searchValue.trim().length > 0) {
+      try {
+        // Escape special regex characters to prevent errors
+        const escapedSearch = searchValue.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const searchRegex = new RegExp(escapedSearch, 'i');
+        searchQuery = {
+          $or: [
+            { displayName: searchRegex },
+            { membershipLevel: searchRegex },
+            { channelId: searchRegex }
+          ]
+        };
+        logger.info('Search query constructed:', { searchValue: searchValue.trim(), searchQuery });
+      } catch (error) {
+        logger.error('Error constructing search regex:', error);
+        // If regex fails, fall back to text search
+        searchQuery = {
+          $or: [
+            { displayName: { $regex: searchValue.trim(), $options: 'i' } },
+            { membershipLevel: { $regex: searchValue.trim(), $options: 'i' } },
+            { channelId: { $regex: searchValue.trim(), $options: 'i' } }
+          ]
+        };
+      }
+    }
+
+    // Build sort object
+    const sortColumn = columns[parseInt(orderColumn)] || 'superfanScore';
+    const sortDirection = orderDir === 'asc' ? 1 : -1;
+    const sort = { [sortColumn]: sortDirection };
+
+    // Get total count
+    const totalRecords = await Member.countDocuments();
+    const filteredRecords = await Member.countDocuments(searchQuery);
+
+    // Get paginated data
+    const data = await Member
+      .find(searchQuery)
+      .sort(sort)
+      .skip(parseInt(start))
+      .limit(parseInt(length))
+      .lean();
+
+    // Format data for DataTables
+    const formattedData = data.map(item => {
+      const actionButtons = `
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn btn-outline-primary btn-sm" 
+                  onclick="viewSuperfan('${item._id}')" 
+                  title="View Details">
+            <i class="fas fa-eye"></i>
+          </button>
+          <button type="button" class="btn btn-outline-info btn-sm" 
+                  onclick="viewSuperfanComments('${item.channelId}')" 
+                  title="View Comments">
+            <i class="fas fa-comments"></i>
+          </button>
+        </div>
+      `;
+      
+      return [
+        item.displayName,
+        item.superfanScore || 0,
+        item.membershipLevel || 'none',
+        item.totalComments || 0,
+        item.lastCommentAt ? new Date(item.lastCommentAt).toLocaleString() : 'Never',
+        new Date(item.memberSince).toLocaleDateString(),
+        item.isActive ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Inactive</span>',
+        actionButtons
+      ];
+    });
+
+    res.json({
+      draw: parseInt(draw),
+      recordsTotal: totalRecords,
+      recordsFiltered: filteredRecords,
+      data: formattedData
+    });
+
+  } catch (error) {
+    logger.error('Error fetching superfans:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API endpoint to get superfan details
+router.get('/superfan/:memberId', async (req, res) => {
+  try {
+    const memberId = req.params.memberId;
+    const member = await Member.findById(memberId).lean();
+    
+    if (!member) {
+      return res.status(404).json({ error: 'Superfan not found' });
+    }
+    
+    res.json(member);
+  } catch (error) {
+    logger.error('Error fetching superfan details:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API endpoint to get superfan comments
+router.get('/superfan-comments/:channelId', async (req, res) => {
+  try {
+    const channelId = req.params.channelId;
+    const Comment = require('../models/Comment');
+    
+    const comments = await Comment.find({ authorChannelId: channelId })
+      .sort({ publishedAt: -1 })
+      .limit(50)
+      .lean();
+    
+    res.json({ comments });
+  } catch (error) {
+    logger.error('Error fetching superfan comments:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // API endpoint to get dashboard statistics
 router.get('/stats', async (req, res) => {
   try {
@@ -285,7 +439,9 @@ router.get('/stats', async (req, res) => {
       weeklyVideoCount,
       totalCommentActions,
       totalProcessedVideos,
-      recentActions
+      recentActions,
+      totalSuperfans,
+      activeSuperfans
     ] = await Promise.all([
       CommentAction.countDocuments({ actionType: 'replied' }),
       CommentAction.countDocuments({ actionType: 'deleted' }),
@@ -295,7 +451,9 @@ router.get('/stats', async (req, res) => {
       ProcessedVideo.countDocuments(),
       CommentAction.countDocuments({
         processedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
-      })
+      }),
+      Member.countDocuments({ isSuperfan: true }),
+      Member.countDocuments({ isSuperfan: true, isActive: true })
     ]);
 
     const stats = {
@@ -305,7 +463,9 @@ router.get('/stats', async (req, res) => {
       weeklyVideoCount,
       totalCommentActions,
       totalProcessedVideos,
-      recentActions
+      recentActions,
+      totalSuperfans,
+      activeSuperfans
     };
 
     logger.info('Dashboard stats:', stats);
